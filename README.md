@@ -5,10 +5,13 @@ This package provides a clean way to generate Swagger/OpenAPI documentation for 
 ## Features
 
 - Use modern PHP 8 Attributes to document your API endpoints
+- Leverage PHP 8 Enums for type safety and standardization
 - Automatically extract validation rules from Laravel Form Request classes
 - Document API exceptions with status codes and error messages
 - Command-line tool to scan routes and generate Swagger documentation
-- Built-in Swagger UI for viewing documentation
+- Built-in Swagger UI and Redoc UI for viewing documentation
+- Extract property types from Laravel IDE Helper PHPDoc comments
+- Support for query parameters with repeatable attributes
 - Fully customizable through configuration
 
 ## Requirements
@@ -24,10 +27,16 @@ You can install the package via composer:
 composer require bellissimopizza/laravel-swagger-attributes
 ```
 
-After installing, publish the configuration file:
+After installing, publish the configuration and assets:
 
 ```bash
-php artisan vendor:publish --provider="BellissimoPizza\SwaggerAttributes\Providers\SwaggerAttributesServiceProvider" --tag="config"
+# Publish everything
+php artisan vendor:publish --provider="BellissimoPizza\SwaggerAttributes\Providers\SwaggerAttributesServiceProvider" --tag="swagger-attributes"
+
+# Or publish individually
+php artisan vendor:publish --provider="BellissimoPizza\SwaggerAttributes\Providers\SwaggerAttributesServiceProvider" --tag="swagger-attributes-config"
+php artisan vendor:publish --provider="BellissimoPizza\SwaggerAttributes\Providers\SwaggerAttributesServiceProvider" --tag="swagger-attributes-views"
+php artisan vendor:publish --provider="BellissimoPizza\SwaggerAttributes\Providers\SwaggerAttributesServiceProvider" --tag="swagger-attributes-assets"
 ```
 
 ## Usage
@@ -41,6 +50,30 @@ return [
     'title' => 'My API Documentation',
     'description' => 'Documentation for my awesome API',
     'version' => '1.0.0',
+    
+    // UI configuration - choose between Swagger UI and Redoc
+    'ui' => [
+        // Which UI to use: 'swagger', 'redoc', or 'both'
+        'type' => 'both',
+        
+        // UI routes
+        'swagger_route' => 'api/documentation',
+        'redoc_route' => 'api/redoc',
+        
+        // Redoc options
+        'redoc' => [
+            'theme' => 'light',  // light, dark
+            'hide_download_button' => false,
+            'expand_responses' => 'all', // all, success, none
+        ],
+        
+        // Swagger UI options
+        'swagger' => [
+            'deep_linking' => true,
+            'doc_expansion' => 'list', // list, full, none
+        ],
+    ],
+    
     // ...other configuration options
 ];
 ```
@@ -204,17 +237,75 @@ php artisan swagger:generate --output=public/api-docs/swagger.json --format=json
 php artisan swagger:generate --output=public/api-docs/swagger.yaml --format=yaml
 ```
 
-The file extension will be automatically added if not specified in the output path.
-
 ### Viewing Documentation
 
-If you have enabled the Swagger UI in the configuration, you can view your API documentation at:
+Once generated, you can view your documentation at the following URLs:
 
-```
-http://your-app.test/api/documentation
+- Swagger UI: `/api/documentation` (or your custom route)
+- Redoc UI: `/api/redoc` (or your custom route)
+
+You can configure which UI is enabled in the configuration file:
+
+```php
+'ui' => [
+    'type' => 'both', // Options: 'swagger', 'redoc', 'both'
+],
 ```
 
-You can customize this URL in the configuration file.
+### IDE Helper Integration
+
+This package can read Laravel IDE Helper generated PHPDoc comments to improve the accuracy of property types in your model schemas. If you have [Laravel IDE Helper](https://github.com/barryvdh/laravel-ide-helper) installed and have generated model docs, the package will automatically read the `@property`, `@property-read`, and `@property-write` annotations to determine property types.
+
+For example, if your model has:
+
+```php
+/**
+ * @property int $id
+ * @property string $name
+ * @property-read \Carbon\Carbon $created_at
+ * @property-write array $settings
+ */
+class User extends Model
+{
+    // ...model code
+}
+```
+
+These types will be used to generate more accurate OpenAPI schemas compared to just using database column types.
+
+### Enhanced Response Schemas
+
+The package now properly formats response schemas according to OpenAPI 3.0 specifications. When using custom response schemas, you can use PHP 8 enums to define data types:
+
+```php
+use BellissimoPizza\SwaggerAttributes\Enums\OpenApiDataType;
+
+#[ApiSwaggerResponse(
+    statusCode: 200,
+    schema: [
+        'id' => OpenApiDataType::INTEGER,
+        'name' => OpenApiDataType::STRING,
+        'created_at' => OpenApiDataType::DATE_TIME,
+        'is_active' => OpenApiDataType::BOOLEAN,
+    ]
+)]
+```
+
+The enum values are automatically converted to proper OpenAPI type and format objects in the schema.
+
+The file extension will be automatically added if not specified in the output path. Old documentation files are automatically deleted before generating new ones to ensure clean output.
+
+### Additional Improvements
+
+#### HTTP Method Normalization
+
+The package now automatically normalizes HTTP methods to lowercase in the OpenAPI paths to ensure compatibility with all OpenAPI consumers and prevent duplicate endpoints with different method casing.
+
+#### Auto-cleaning of Documentation Files
+
+When generating new documentation, any existing Swagger JSON/YAML files are automatically deleted first. This ensures you always have a clean, up-to-date documentation file without artifacts from previous generations.
+
+You can view your API documentation at the route you specified in the configuration file.
 
 ## Contributing
 

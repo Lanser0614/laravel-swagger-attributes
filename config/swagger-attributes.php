@@ -49,14 +49,39 @@ return [
         ['bearerAuth' => []],
     ],
 
-    // Enable Swagger UI
-    'enable_ui' => env('SWAGGER_ENABLE_UI', true),
-    
-    // Swagger UI route
-    'ui_route' => env('SWAGGER_UI_ROUTE', 'api/documentation'),
-
-    // Route middleware for Swagger UI
-    'ui_middleware' => env('SWAGGER_UI_MIDDLEWARE', 'web'),
+    // UI Options
+    'ui' => [
+        // Which UI to use: 'swagger', 'redoc', or 'both'
+        'type' => env('SWAGGER_UI_TYPE', 'swagger'),
+        
+        // Enable UI
+        'enabled' => env('SWAGGER_ENABLE_UI', true),
+        
+        // UI routes
+        'swagger_route' => env('SWAGGER_UI_ROUTE', 'api/documentation'),
+        'redoc_route' => env('REDOC_UI_ROUTE', 'api/redoc'),
+        
+        // Route middleware for UI
+        'middleware' => env('SWAGGER_UI_MIDDLEWARE', 'web'),
+        
+        // Redoc options
+        'redoc' => [
+            'theme' => env('REDOC_THEME', 'light'),  // light, dark
+            'hide_download_button' => env('REDOC_HIDE_DOWNLOAD', false),
+            'expand_responses' => env('REDOC_EXPAND_RESPONSES', 'all'), // all, success, none
+            'scroll_y_offset' => env('REDOC_SCROLL_Y_OFFSET', 0),
+        ],
+        
+        // Swagger UI options
+        'swagger' => [
+            'deep_linking' => true,
+            'display_operation_id' => false,
+            'default_models_expand_depth' => 1,
+            'default_model_expand_depth' => 1,
+            'default_model_rendering' => 'example',
+            'doc_expansion' => 'list', // list, full, none
+        ],
+    ],
     
     // Include these controller namespaces in the scan
     'include_namespaces' => [

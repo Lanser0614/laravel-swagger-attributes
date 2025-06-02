@@ -44,10 +44,19 @@
     <script src="https://unpkg.com/swagger-ui-dist@4.5.0/swagger-ui-standalone-preset.js"></script>
     <script>
         window.onload = function() {
-            const ui = SwaggerUIBundle({
+            // Get the config options
+            const options = @json(json_decode($options ?? '{}', true));
+            
+            // Set up the UI configuration with defaults and any overrides from config
+            const uiConfig = {
                 url: "{{ $documentationUrl }}",
                 dom_id: '#swagger-ui',
-                deepLinking: true,
+                deepLinking: options.deep_linking !== undefined ? options.deep_linking : true,
+                displayOperationId: options.display_operation_id !== undefined ? options.display_operation_id : false,
+                defaultModelsExpandDepth: options.default_models_expand_depth !== undefined ? options.default_models_expand_depth : 1,
+                defaultModelExpandDepth: options.default_model_expand_depth !== undefined ? options.default_model_expand_depth : 1,
+                defaultModelRendering: options.default_model_rendering !== undefined ? options.default_model_rendering : 'example',
+                docExpansion: options.doc_expansion !== undefined ? options.doc_expansion : 'list',
                 presets: [
                     SwaggerUIBundle.presets.apis,
                     SwaggerUIStandalonePreset
@@ -56,8 +65,9 @@
                     SwaggerUIBundle.plugins.DownloadUrl
                 ],
                 layout: "StandaloneLayout"
-            });
-
+            };
+            
+            const ui = SwaggerUIBundle(uiConfig);
             window.ui = ui;
         }
     </script>
