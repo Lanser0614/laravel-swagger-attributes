@@ -1,0 +1,53 @@
+# Composer dependencies
+/vendor/
+composer.lock
+
+# PHP CS Fixer
+.php-cs-fixer.cache
+.php_cs.cache
+.php_cs
+
+# PHPUnit
+/phpunit.xml
+.phpunit.result.cache
+.phpunit.cache/
+
+# PhpStorm & IDEA
+/.idea
+/.fleet
+
+# VS Code
+/.vscode
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Mac OS files
+.DS_Store
+
+# Windows thumbnail cache files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Local environment variables
+.env
+.env.backup
+
+# Build artifacts
+/build/
+/dist/
+
+# Test coverage reports
+/coverage/
+/coverage.xml
+/clover.xml
+
+# Other
+/node_modules
+/npm-debug.log
+/yarn-error.log
+/.phpstorm.meta.php
+/_ide_helper.php
+/_ide_helper_models.php
