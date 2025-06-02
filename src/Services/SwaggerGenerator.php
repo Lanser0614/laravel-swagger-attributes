@@ -190,16 +190,11 @@ class SwaggerGenerator
         // Convert enum to lowercase string for OpenAPI spec
         $methodKey = strtolower($method->value);
         
-        // Set method properties
-        $this->openApi['paths'][$path][$methodKey] = [
+        // Create basic operation object
+        $operation = [
             'tags' => [$apiSwagger->tag],
             'summary' => $apiSwagger->summary,
             'description' => $apiSwagger->description,
-            'responses' => [],
-        ];
-        
-        // Create basic operation object
-        $operation = [
             'operationId' => $this->generateOperationId($route),
             'responses' => [
                 '200' => [
