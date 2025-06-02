@@ -233,8 +233,9 @@ class SwaggerGenerator
             $operation['security'] = config('swagger-attributes.security');
         }
         
-        // Add the operation to the path
-        $this->openApi['paths'][$path][$method] = $operation;
+        // Add the operation to the path - convert enum to lowercase string for array key
+        // OpenAPI spec expects lowercase HTTP methods
+        $this->openApi['paths'][$path][strtolower($method->value)] = $operation;
     }
 
     /**
@@ -635,9 +636,39 @@ class SwaggerGenerator
      */
     protected function getResponseSchema(ApiSwaggerResponse $response): array
     {
-        // If custom schema is provided, use it
+        // If custom schema is provided, use it but ensure it follows OpenAPI structure
         if (!empty($response->schema)) {
-            return $response->schema;
+            // Check if schema already has a type and possibly properties structure
+            if (isset($response->schema['type'])) {
+                return $response->schema;
+            } else {
+                // Process properties to handle enums and convert to proper schema objects
+                $properties = [];
+                foreach ($response->schema as $property => $type) {
+                    if ($type instanceof OpenApiDataType) {
+                        // Convert OpenApiDataType enum to proper schema
+                        $properties[$property] = ['type' => $type->value];
+                        
+                        // Add format if available
+                        $defaultFormat = $type->defaultFormat();
+                        if ($defaultFormat) {
+                            $properties[$property]['format'] = $defaultFormat;
+                        }
+                    } elseif (is_array($type)) {
+                        // Array is already a schema definition
+                        $properties[$property] = $type;
+                    } else {
+                        // String or other primitive value
+                        $properties[$property] = ['type' => (string)$type];
+                    }
+                }
+                
+                // Return properly structured schema
+                return [
+                    'type' => 'object',
+                    'properties' => $properties
+                ];
+            }
         }
         
         // If no model is provided, return a default schema
@@ -702,42 +733,6 @@ protected function generateModelSchema(string $modelClass): array
             }
             
             // Add any appends attributes from the model
-            if (method_exists($model, 'getAppends') && is_array($model->getAppends())) {
-                foreach ($model->getAppends() as $append) {
-                    $schema['properties'][$append] = ['type' => 'string'];
-                }
-            }
-        }
-        
-        return $schema;
-     * @param string $modelClass Fully qualified model class name
-     * @return array The generated schema
-     */
-    protected function generateModelSchema(string $modelClass): array
-    {
-        try {
-            $model = new $modelClass();
-            
-            if (!$model instanceof Model) {
-                return ['type' => 'object', 'properties' => []];
-            }
-            
-            $table = $model->getTable();
-            $connection = $model->getConnection();
-            $schema = ['type' => 'object', 'properties' => []];
-            
-            // Get the columns from the table
-            if (Schema::connection($connection->getName())->hasTable($table)) {
-                $columns = Schema::connection($connection->getName())->getColumnListing($table);
-                
-                foreach ($columns as $column) {
-                    $type = Schema::connection($connection->getName())
-                        ->getColumnType($table, $column);
-                    
-                    $schema['properties'][$column] = $this->mapDatabaseTypeToOpenApi($type);
-                }
-                
-                // Add any appends attributes from the model
                 if (method_exists($model, 'getAppends') && is_array($model->getAppends())) {
                     foreach ($model->getAppends() as $append) {
                         $schema['properties'][$append] = ['type' => 'string'];
@@ -857,6 +852,11 @@ protected function generateModelSchema(string $modelClass): array
         
         if (!File::exists($directory)) {
             File::makeDirectory($directory, 0755, true);
+        }
+        
+        // Remove existing file if it exists to ensure clean generation
+        if (File::exists($outputPath)) {
+            File::delete($outputPath);
         }
         
         // Convert the OpenAPI spec to the requested format
