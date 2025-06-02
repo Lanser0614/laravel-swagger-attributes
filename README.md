@@ -305,6 +305,10 @@ The package now automatically normalizes HTTP methods to lowercase in the OpenAP
 
 When generating new documentation, any existing Swagger JSON/YAML files are automatically deleted first. This ensures you always have a clean, up-to-date documentation file without artifacts from previous generations.
 
+#### Direct File Access
+
+The package now reads documentation files directly from storage instead of requiring them to be publicly accessible via URLs. This improves security by eliminating the need for symbolic links between storage and public directories, and simplifies deployment across different environments.
+
 You can view your API documentation at the route you specified in the configuration file.
 
 ## Contributing

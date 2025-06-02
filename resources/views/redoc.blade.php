@@ -23,6 +23,9 @@
     <script>
         const options = @json(json_decode($options ?? '{}', true));
         
+        // Parse the spec content
+        const specObject = JSON.parse(@json($specContent));
+        
         // Initialize with default options
         const defaultOptions = {
             theme: {
@@ -83,8 +86,8 @@
             }
         }
         
-        // Initialize Redoc
-        Redoc.init('{{ $documentationUrl }}', defaultOptions, document.getElementById('redoc-container'));
+        // Initialize Redoc with spec object directly
+        Redoc.init(specObject, defaultOptions, document.getElementById('redoc-container'));
     </script>
 </body>
 </html>

@@ -55,31 +55,5 @@ class SwaggerAttributesServiceProvider extends ServiceProvider
 
         // Register routes for Swagger UI and Redoc
         $this->loadRoutesFrom(__DIR__ . '/../../routes/web.php');
-        
-        // Create a symbolic link from public/api-docs to storage/api-docs if needed
-        $this->createPublicSymlink();
-    }
-    
-    /**
-     * Create a symbolic link from public/api-docs to storage/api-docs
-     * This is needed to access the generated documentation file
-     */
-    protected function createPublicSymlink(): void
-    {
-        $publicPath = public_path('api-docs');
-        $storagePath = storage_path('api-docs');
-        
-        // Skip if not running in HTTP context or the link already exists
-        if (!$this->app->runningInConsole() && !file_exists($publicPath) && file_exists($storagePath)) {
-            if (function_exists('symlink')) {
-                // Create the directory if it doesn't exist
-                if (!is_dir(dirname($publicPath))) {
-                    mkdir(dirname($publicPath), 0755, true);
-                }
-                
-                // Create the symbolic link
-                symlink($storagePath, $publicPath);
-            }
-        }
     }
 }

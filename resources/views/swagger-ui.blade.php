@@ -47,9 +47,13 @@
             // Get the config options
             const options = @json(json_decode($options ?? '{}', true));
             
+            // Parse the spec content
+            const specObject = JSON.parse(@json($specContent));
+            
             // Set up the UI configuration with defaults and any overrides from config
             const uiConfig = {
-                url: "{{ $documentationUrl }}",
+                // Use spec object directly instead of URL
+                spec: specObject,
                 dom_id: '#swagger-ui',
                 deepLinking: options.deep_linking !== undefined ? options.deep_linking : true,
                 displayOperationId: options.display_operation_id !== undefined ? options.display_operation_id : false,
