@@ -311,6 +311,129 @@ The package now reads documentation files directly from storage instead of requi
 
 You can view your API documentation at the route you specified in the configuration file.
 
+#### Fixed Tag Handling
+
+Endpoints are now properly grouped by tags in both Swagger UI and Redoc. The tag, summary, and description from your `ApiSwagger` attributes are correctly applied to the OpenAPI specification.
+
+### Authentication
+
+#### JWT Authentication
+
+You can configure JWT authentication for your API endpoints by adding security schemes to your configuration:
+
+```php
+// In config/swagger-attributes.php
+'components' => [
+    'securitySchemes' => [
+        'JWT' => [
+            'description' => 'JWT bearer token description...',
+            'type' => 'http',
+            'scheme' => 'bearer',
+            'bearerFormat' => 'JWT',
+        ],
+    ],
+],
+
+// Apply JWT security globally to all endpoints
+'security' => [
+    ['JWT' => []],
+],
+```
+
+To apply security to specific endpoints or override global security, use the security parameter in the ApiSwagger attribute:
+
+```php
+#[ApiSwagger(
+    tag: 'Users',
+    summary: 'Get user profile',
+    security: [['JWT' => []]]
+)]
+public function profile()
+{
+    // ...
+}
+
+// Or to mark an endpoint as not requiring authentication:
+#[ApiSwagger(
+    tag: 'Auth',
+    summary: 'Login',
+    security: [] // Empty array means no security required
+)]
+public function login()
+{
+    // ...
+}
+```
+
+### Schema Usage Options
+
+The package provides multiple ways to define schemas for your API responses:
+
+#### 1. Using Eloquent Models
+
+```php
+#[ApiSwaggerResponse(
+    statusCode: 200,
+    model: User::class,
+    isCollection: false  // Set to true for arrays of models
+)]
+public function show(User $user)
+{
+    return $user;
+}
+```
+
+#### 2. Using Custom Schema Arrays with Enums
+
+```php
+#[ApiSwaggerResponse(
+    statusCode: 200,
+    schema: [
+        'id' => OpenApiDataType::INTEGER,
+        'name' => OpenApiDataType::STRING,
+        'email' => OpenApiDataType::EMAIL,
+        'created_at' => OpenApiDataType::DATE_TIME,
+        'is_active' => OpenApiDataType::BOOLEAN
+    ]
+)]
+public function getData()
+{
+    // ...
+}
+```
+
+#### 3. Using Full OpenAPI Schema Objects
+
+```php
+#[ApiSwaggerResponse(
+    statusCode: 200,
+    schema: [
+        'type' => 'object',
+        'properties' => [
+            'id' => ['type' => 'integer'],
+            'name' => ['type' => 'string'],
+            'address' => [
+                'type' => 'object',
+                'properties' => [
+                    'street' => ['type' => 'string'],
+                    'city' => ['type' => 'string'],
+                    'zip' => ['type' => 'string']
+                ]
+            ],
+            'tags' => [
+                'type' => 'array',
+                'items' => ['type' => 'string']
+            ]
+        ],
+        'required' => ['id', 'name']
+    ]
+)]
+public function getComplexData()
+{
+    // ...
+}
+```
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
