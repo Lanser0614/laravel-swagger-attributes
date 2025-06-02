@@ -35,24 +35,27 @@ return [
         ],
     ],
 
-    // Security Schemes
-    'security_schemes' => [
-        'bearerAuth' => [
-            'type' => 'http',
-            'scheme' => 'bearer',
-            'bearerFormat' => 'JWT',
+    // Security Schemes - OpenAPI 3.0 Components object
+    'components' => [
+        'securitySchemes' => [
+            'JWT' => [
+                'description' => 'JWT bearer token description...',
+                'type' => 'http',
+                'scheme' => 'bearer',
+                'bearerFormat' => 'JWT',
+            ],
         ],
     ],
 
     // Default security to apply to all endpoints
     'security' => [
-        ['bearerAuth' => []],
+        ['JWT' => []],
     ],
 
     // UI Options
     'ui' => [
         // Which UI to use: 'swagger', 'redoc', or 'both'
-        'type' => env('SWAGGER_UI_TYPE', 'swagger'),
+        'type' => env('SWAGGER_UI_TYPE', 'both'),
         
         // Enable UI
         'enabled' => env('SWAGGER_ENABLE_UI', true),

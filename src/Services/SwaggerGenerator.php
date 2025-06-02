@@ -73,10 +73,10 @@ class SwaggerGenerator
                 ['url' => config('app.url'), 'description' => 'API Server'],
             ]),
             'paths' => [],
-            'components' => [
+            'components' => config('swagger-attributes.components', [
                 'schemas' => [],
-                'securitySchemes' => config('swagger-attributes.security_schemes', []),
-            ],
+                'securitySchemes' => [],
+            ]),
             'tags' => [],
         ];
     }
