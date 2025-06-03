@@ -13,10 +13,10 @@ class ResourceSchemaExtractor
      *
      * @param string $resourceClass Fully qualified class name of a Laravel Resource
      * @param string|null $modelClass Optional related model class name
-     * @param SwaggerGenerator|null $generator Reference to the main generator for model schema generation
+     * @param OpenApiGenerator|null $generator Reference to the main generator for model schema generation
      * @return array|null The generated schema or null if unable to generate
      */
-    public function generateResourceSchema(string $resourceClass, ?string $modelClass = null, SwaggerGenerator $generator = null): ?array
+    public function generateResourceSchema(string $resourceClass, ?string $modelClass = null, OpenApiGenerator $generator = null): ?array
     {
         try {
             // Validate the resource class exists

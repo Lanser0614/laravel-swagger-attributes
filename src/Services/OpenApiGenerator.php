@@ -698,7 +698,7 @@ class OpenApiGenerator
             ];
 
             // If we have a model or schema, add content
-            if ($response->model || !empty($response->schema)) {
+            if ($response->model || !empty($response->schema) || $response->resource) {
                 $schema = $this->getResponseSchema($response);
 
                 $responseObject['content'] = [
@@ -724,7 +724,7 @@ class OpenApiGenerator
         $resourceSchema = null;
         $customProperties = [];
 
-        // Generate model schema if a model is provided
+        // Generate a model schema if a model is provided
         if ($response->model && class_exists($response->model)) {
             $modelSchema = $this->generateModelSchema($response->model);
         }
