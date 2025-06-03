@@ -38,12 +38,12 @@ After installing, publish the configuration and assets:
 
 ```bash
 # Publish everything
-php artisan vendor:publish --provider="BellissimoPizza\SwaggerAttributes\Providers\SwaggerAttributesServiceProvider" --tag="swagger-attributes"
+php artisan vendor:publish --provider="BellissimoPizza\SwaggerAttributes\Providers\SwaggerAttributesServiceProvider" --tag="openapi-attributes"
 
 # Or publish individually
-php artisan vendor:publish --provider="BellissimoPizza\SwaggerAttributes\Providers\SwaggerAttributesServiceProvider" --tag="swagger-attributes-config"
-php artisan vendor:publish --provider="BellissimoPizza\SwaggerAttributes\Providers\SwaggerAttributesServiceProvider" --tag="swagger-attributes-views"
-php artisan vendor:publish --provider="BellissimoPizza\SwaggerAttributes\Providers\SwaggerAttributesServiceProvider" --tag="swagger-attributes-assets"
+php artisan vendor:publish --provider="BellissimoPizza\SwaggerAttributes\Providers\SwaggerAttributesServiceProvider" --tag="openapi-attributes-config"
+php artisan vendor:publish --provider="BellissimoPizza\SwaggerAttributes\Providers\SwaggerAttributesServiceProvider" --tag="openapi-attributes-views"
+php artisan vendor:publish --provider="BellissimoPizza\SwaggerAttributes\Providers\SwaggerAttributesServiceProvider" --tag="openapi-attributes-assets"
 ```
 
 ## Usage

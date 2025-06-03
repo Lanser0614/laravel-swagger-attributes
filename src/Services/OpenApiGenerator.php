@@ -885,10 +885,14 @@ class OpenApiGenerator
                     if (isset($propertyTypes[$column])) {
                         $schema['properties'][$column] = $this->convertPhpTypeToOpenApi($propertyTypes[$column]);
                     } else {
-                        $type = Schema::connection($connection->getName())
-                            ->getColumnType($table, $column);
+                        try {
+                            $type = Schema::connection($connection->getName())
+                                ->getColumnType($table, $column);
 
-                        $schema['properties'][$column] = $this->mapDatabaseTypeToOpenApi($type);
+                            $schema['properties'][$column] = $this->mapDatabaseTypeToOpenApi($type);
+                        } catch (\Throwable $exception) {
+                            $schema['properties'][$column] = ['type' => 'string'];
+                        }
                     }
                 }
 
@@ -1062,6 +1066,10 @@ class OpenApiGenerator
             case 'polygon':
             case 'circle':
                 return ['type' => 'string', 'description' => 'PostgreSQL geometric type'];
+
+            // Enum types (MySQL and MariaDB)
+            case 'enum':
+                return ['type' => 'string', 'description' => 'Enumerated type'];
 
             // Text and character types
             case 'char':

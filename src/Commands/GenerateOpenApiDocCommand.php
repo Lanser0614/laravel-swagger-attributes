@@ -28,7 +28,7 @@ class GenerateOpenApiDocCommand extends Command
      */
     public function handle(OpenApiGenerator $generator): int
     {
-        $outputPath = $this->option('output') ?: config('swagger-attributes.output_file');
+        $outputPath = $this->option('output') ?: config('openapi-attributes.output_file');
         $format = strtolower($this->option('format'));
         
         // Validate format option
@@ -45,7 +45,7 @@ class GenerateOpenApiDocCommand extends Command
             if ($documentationGenerated) {
                 $this->info('Swagger documentation has been generated successfully.');
                 
-                // Get the final path with extension that might have been added by the generator
+                // Get the final path with the extension that might have been added by the generator
                 $extension = $format === 'json' ? '.json' : '.yaml';
                 if (!preg_match('/\.' . preg_quote($extension, '/') . '$/i', $outputPath)) {
                     $outputPath = preg_replace('/\.(?:json|ya?ml)$/i', $extension, $outputPath);
