@@ -32,10 +32,10 @@ class ResourceSchemaExtractor
             $reflectionClass = new ReflectionClass($resourceClass);
 
             // Check if this is a collection
-//            $isCollection = $this->isResourceCollection($reflectionClass);
+            $isCollection = $this->isResourceCollection($reflectionClass);
 
             // Check if this is a Laravel resource
-            $isResource = $reflectionClass->isSubclassOf(JsonResource::class);
+            $isResource = $isCollection || $reflectionClass->isSubclassOf(JsonResource::class);
 
             if (!$isResource) {
                 // Not a Laravel resource, return null
@@ -43,9 +43,9 @@ class ResourceSchemaExtractor
             }
 
             // Handle collection differently
-//            if ($isCollection) {
-//                return $this->generateCollectionSchema($resourceClass, $modelClass, $generator);
-//            }
+            if ($isCollection) {
+                return $this->generateCollectionSchema($resourceClass, $modelClass, $generator);
+            }
 
             // Create a base schema structure for a single resource
             $schema = [
@@ -61,7 +61,6 @@ class ResourceSchemaExtractor
                 }
             }
 
-
             // Look for toArray method
             if ($reflectionClass->hasMethod('toArray')) {
                 $toArrayMethod = $reflectionClass->getMethod('toArray');
@@ -72,8 +71,8 @@ class ResourceSchemaExtractor
                     $this->extractPropertiesFromDocComment($docComment, $schema);
                 }
 
-                // Use improved property extraction from method body
-                $this->extractPropertiesFromMethodBody($toArrayMethod, $schema);
+                // Extract properties from method body with nested structure support
+                $this->extractNestedStructureFromMethod($toArrayMethod, $schema);
             }
 
             // Look for additional methods that might add fields
@@ -104,9 +103,12 @@ class ResourceSchemaExtractor
             return true;
         }
 
-        // Check for collection method
+        // Check for collection method - but make sure it's a static method on the class itself, not the JsonResource parent
         if ($reflectionClass->isSubclassOf(JsonResource::class) && $reflectionClass->hasMethod('collection')) {
-            return true;
+            $method = $reflectionClass->getMethod('collection');
+            if ($method->isStatic() && $method->getDeclaringClass()->getName() === $reflectionClass->getName()) {
+                return true;
+            }
         }
 
         return false;
@@ -119,6 +121,7 @@ class ResourceSchemaExtractor
      * @param string|null $modelClass Optional related model class
      * @param OpenApiGenerator|null $generator Reference to main generator
      * @return array The generated schema
+     * @throws \ReflectionException
      */
     protected function generateCollectionSchema(string $resourceClass, ?string $modelClass = null, ?OpenApiGenerator $generator = null): array
     {
@@ -292,7 +295,7 @@ class ResourceSchemaExtractor
             if ($reflectionClass->hasMethod($methodName)) {
                 $method = $reflectionClass->getMethod($methodName);
                 if (!$method->isAbstract()) {
-                    $this->extractPropertiesFromMethodBody($method, $schema);
+                    $this->extractNestedStructureFromMethod($method, $schema);
                 }
             }
         }
@@ -345,12 +348,12 @@ class ResourceSchemaExtractor
     }
 
     /**
-     * Extract properties by analyzing the method body with improved type detection
+     * Extract nested structure from a method
      *
      * @param ReflectionMethod $method The method to analyze
      * @param array $schema The schema to populate
      */
-    protected function extractPropertiesFromMethodBody(ReflectionMethod $method, array &$schema): void
+    protected function extractNestedStructureFromMethod(ReflectionMethod $method, array &$schema): void
     {
         $fileName = $method->getFileName();
         $startLine = $method->getStartLine();
@@ -373,50 +376,15 @@ class ResourceSchemaExtractor
 
         $methodBody = implode("\n", $lines);
 
-        // Make sure schema has properties array
-        if (!isset($schema['properties'])) {
-            $schema['properties'] = [];
-        }
-
-        // Extract structure from arrays in the method body
-        $this->extractNestedStructure($methodBody, $schema);
-
-        // Basic pattern for array keys with improved type detection
-        $pattern = '/[\'"](\w+)[\'"]\s*=>\s*([^,;\n\]]+)/';
-        if (preg_match_all($pattern, $methodBody, $matches, PREG_SET_ORDER)) {
-            foreach ($matches as $match) {
-                $property = $match[1];
-                $value = trim($match[2]);
-
-                if (!isset($schema['properties'][$property])) {
-                    // Infer type based on the value
-                    if (is_numeric($value)) {
-                        // Detect if it's an integer or float
-                        if (strpos($value, '.') !== false) {
-                            $schema['properties'][$property] = ['type' => 'number'];
-                        } else {
-                            $schema['properties'][$property] = ['type' => 'integer'];
-                        }
-                    } elseif ($value === 'true' || $value === 'false') {
-                        $schema['properties'][$property] = ['type' => 'boolean'];
-                    } elseif ($value === 'null') {
-                        $schema['properties'][$property] = ['type' => 'string', 'nullable' => true];
-                    } elseif (preg_match('/^\[|array\(|collect\(/', $value)) {
-                        $schema['properties'][$property] = ['type' => 'array', 'items' => ['type' => 'string']];
-                    } else {
-                        $schema['properties'][$property] = ['type' => 'string'];
-                    }
-                }
-            }
+        // Find the return array structure
+        if (preg_match('/return\s*\[\s*(.*?)\s*\]\s*;/s', $methodBody, $matches)) {
+            $returnContent = $matches[1];
+            $this->extractNestedStructure($returnContent, $schema['properties']);
         }
 
         // Look for whenLoaded patterns (relationships)
         $whenLoadedPattern = '/whenLoaded\([\'"](\w+)[\'"]/';
         if (preg_match_all($whenLoadedPattern, $methodBody, $matches)) {
-            if (!isset($schema['properties'])) {
-                $schema['properties'] = [];
-            }
-
             foreach ($matches[1] as $relation) {
                 if (!isset($schema['properties'][$relation])) {
                     $schema['properties'][$relation] = [
@@ -430,81 +398,91 @@ class ResourceSchemaExtractor
     }
 
     /**
+     * Extract nested structure from array content
+     * 
+     * @param string $content Array content
+     * @param array $properties Schema properties to populate
+     */
+    protected function extractNestedStructure(string $content, array &$properties): void
+    {
+        // Extract all key-value pairs, including nested arrays
+        // This regex matches patterns like 'key' => value, where value can be anything
+        $pattern = '/[\'"](\w+)[\'"]\s*=>\s*(.+?)(?=,\s*[\'"]|,\s*$|\s*$)/s';
+        
+        if (preg_match_all($pattern, $content, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $match) {
+                $key = $match[1];
+                $value = trim($match[2]);
+                
+                if (substr($value, 0, 1) === '[' && substr($value, -1) === ']') {
+                    // This is a nested array
+                    $nestedContent = substr($value, 1, -1);
+                    
+                    // Check if this is an associative array (with string keys)
+                    if (preg_match('/[\'"](\w+)[\'"]\s*=>/', $nestedContent)) {
+                        // This is an object (associative array)
+                        $properties[$key] = [
+                            'type' => 'object',
+                            'properties' => []
+                        ];
+                        $this->extractNestedStructure($nestedContent, $properties[$key]['properties']);
+                    } else {
+                        // This is a simple array (non-associative)
+                        $properties[$key] = [
+                            'type' => 'array',
+                            'items' => ['type' => 'string']
+                        ];
+                    }
+                } else {
+                    // This is a simple value
+                    $properties[$key] = $this->inferTypeFromValue($value);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Infer the OpenAPI type from a PHP value
+     * 
+     * @param string $value The PHP value as a string
+     * @return array OpenAPI type definition
+     */
+    protected function inferTypeFromValue(string $value): array
+    {
+        // Remove any trailing comma
+        $value = rtrim($value, ',');
+        
+        // Check for common PHP values and types
+        if ($value === 'true' || $value === 'false') {
+            return ['type' => 'boolean'];
+        } elseif ($value === 'null') {
+            return ['type' => 'string', 'nullable' => true];
+        } elseif (is_numeric($value)) {
+            if (strpos($value, '.') !== false) {
+                return ['type' => 'number'];
+            }
+            return ['type' => 'integer'];
+        } elseif (preg_match('/^[\'"].+[\'"]$/', $value)) {
+            // String literal
+            return ['type' => 'string'];
+        } elseif (strpos($value, '::') !== false) {
+            // Class constant
+            return ['type' => 'string'];
+        } elseif (preg_match('/^\$[a-zA-Z0-9_]+(?:\[[\'"][a-zA-Z0-9_]+[\'"]\])+$/', $value)) {
+            // Array access like $points['spent']
+            return ['type' => 'string'];
+        } else {
+            // Default to string for anything else
+            return ['type' => 'string'];
+        }
+    }
+
+    /**
      * Convert PHP type to OpenAPI type with improved handling of Laravel resources
      *
      * @param string $phpType PHP type hint
      * @return array OpenAPI type definition
      */
-    /**
-     * Extract nested structure from arrays in method body
-     *
-     * @param string $methodBody The method body content
-     * @param array $schema The schema to populate
-     * @param string $currentPath Current path in the structure (for nested recursion)
-     */
-    protected function extractNestedStructure(string $methodBody, array &$schema, string $currentPath = ''): void
-    {
-        // Pattern to match nested array structure with named keys
-        // This pattern finds arrays like: 'key' => ['nestedKey' => value]
-        $pattern = '/[\'"]([\w]+)[\'"]\s*=>\s*\[([^\[\]]*(?:\[(?:[^\[\]]*(?:\[(?:[^\[\]]*(?:\[[^\[\]]*\])*[^\[\]]*)\])*[^\[\]]*)\])*[^\[\]]*)\]/s';
-
-        if (preg_match_all($pattern, $methodBody, $matches, PREG_SET_ORDER)) {
-            foreach ($matches as $match) {
-                $key = $match[1];
-                $nestedContent = $match[2];
-
-                $path = $currentPath ? "$currentPath.$key" : $key;
-
-                // Create nested object in schema
-                $this->ensurePathExists($schema, $path);
-
-                // Recursively process nested content
-                $this->extractNestedStructure($nestedContent, $schema, $path);
-            }
-        }
-    }
-
-    /**
-     * Ensure a nested path exists in the schema
-     *
-     * @param array $schema The schema to modify
-     * @param string $path Dot notation path (e.g., "data.user.settings")
-     */
-    protected function ensurePathExists(array &$schema, string $path): void
-    {
-        $parts = explode('.', $path);
-        $current = &$schema;
-
-        foreach ($parts as $part) {
-            // Make sure we have properties array
-            if (!isset($current['properties'])) {
-                $current['properties'] = [];
-            }
-
-            // Create the property if it doesn't exist
-            if (!isset($current['properties'][$part])) {
-                // Default to object for nested structures
-                $current['properties'][$part] = [
-                    'type' => 'object',
-                    'properties' => []
-                ];
-            } elseif ($current['properties'][$part]['type'] === 'array' && !isset($current['properties'][$part]['items']['properties'])) {
-                // If it's already defined as an array, make sure it has an items object with properties
-                $current['properties'][$part]['items'] = [
-                    'type' => 'object',
-                    'properties' => []
-                ];
-            }
-
-            // Move reference to the next level
-            if ($current['properties'][$part]['type'] === 'array') {
-                $current = &$current['properties'][$part]['items'];
-            } else {
-                $current = &$current['properties'][$part];
-            }
-        }
-    }
-
     protected function convertPhpTypeToOpenApiType(string $phpType): array
     {
         // Clean the type name
