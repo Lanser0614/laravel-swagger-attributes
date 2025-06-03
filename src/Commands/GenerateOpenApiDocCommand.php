@@ -3,7 +3,6 @@
 namespace BellissimoPizza\SwaggerAttributes\Commands;
 
 use BellissimoPizza\SwaggerAttributes\Services\OpenApiGenerator;
-use BellissimoPizza\SwaggerAttributes\Services\SwaggerGenerator;
 use Illuminate\Console\Command;
 
 class GenerateOpenApiDocCommand extends Command
