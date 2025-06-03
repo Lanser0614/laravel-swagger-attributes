@@ -1,4 +1,4 @@
-# Laravel Swagger Attributes
+# Laravel OpenApi Attributes
 
 [![Latest Version](https://img.shields.io/github/v/release/bellissimopizza/laravel-swagger-attributes)](https://github.com/bellissimopizza/laravel-swagger-attributes/releases)
 [![License](https://img.shields.io/github/license/bellissimopizza/laravel-swagger-attributes)](https://github.com/bellissimopizza/laravel-swagger-attributes/blob/main/LICENSE)

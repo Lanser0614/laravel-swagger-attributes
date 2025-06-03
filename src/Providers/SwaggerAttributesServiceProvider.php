@@ -40,16 +40,10 @@ class SwaggerAttributesServiceProvider extends ServiceProvider
                 __DIR__ . '/../../resources/views' => resource_path('views/vendor/openapi-attributes'),
             ], 'openapi-attributes-views');
             
-            // Publish public assets
-            $this->publishes([
-                __DIR__ . '/../../resources/swagger-ui' => public_path('vendor/openapi-attributes'),
-            ], 'openapi-attributes-assets');
-            
             // Publish all assets in one group
             $this->publishes([
                 __DIR__ . '/../../config/openapi-attributes.php' => config_path('openapi-attributes.php'),
                 __DIR__ . '/../../resources/views' => resource_path('views/vendor/openapi-attributes'),
-                __DIR__ . '/../../resources/swagger-ui' => public_path('vendor/openapi-attributes'),
             ], 'openapi-attributes');
         }
 
