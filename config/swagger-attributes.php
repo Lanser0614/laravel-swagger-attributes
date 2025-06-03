@@ -37,6 +37,35 @@ return [
 
     // Security Schemes - OpenAPI 3.0 Components object
     'components' => [
+        'schemas' => [
+            // Add reusable schemas here
+            'ValidationError' => [
+                'type' => 'object',
+                'properties' => [
+                    'message' => [
+                        'type' => 'string',
+                        'example' => 'The given data was invalid.'
+                    ],
+                    'errors' => [
+                        'type' => 'object',
+                        'additionalProperties' => [
+                            'type' => 'array',
+                            'items' => [
+                                'type' => 'string'
+                            ]
+                        ],
+                        'example' => [
+                            'field_name' => [
+                                'The field_name field is required.'
+                            ],
+                            'email' => [
+                                'The email must be a valid email address.'
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ],
         'securitySchemes' => [
             'JWT' => [
                 'description' => 'JWT bearer token description...',

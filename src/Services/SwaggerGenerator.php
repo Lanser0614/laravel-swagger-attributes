@@ -6,6 +6,7 @@ use BellissimoPizza\SwaggerAttributes\Attributes\ApiSwagger;
 use BellissimoPizza\SwaggerAttributes\Attributes\ApiSwaggerException;
 use BellissimoPizza\SwaggerAttributes\Attributes\ApiSwaggerRequestBody;
 use BellissimoPizza\SwaggerAttributes\Attributes\ApiSwaggerResponse;
+use BellissimoPizza\SwaggerAttributes\Attributes\ApiSwaggerValidationErrorResponse;
 use BellissimoPizza\SwaggerAttributes\Attributes\ApiSwaggerQueryParam;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Http\FormRequest;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\File;
 use ReflectionClass;
 use ReflectionMethod;
 use Symfony\Component\Yaml\Yaml;
+use BellissimoPizza\SwaggerAttributes\Services\ResourceSchemaExtractor;
 use BellissimoPizza\SwaggerAttributes\Enums\HttpMethod;
 use BellissimoPizza\SwaggerAttributes\Enums\HttpStatusCode;
 use BellissimoPizza\SwaggerAttributes\Enums\OpenApiDataType;
@@ -168,11 +170,15 @@ class SwaggerGenerator
             
             if (!empty($filteredMethods)) {
                 $httpMethod = reset($filteredMethods);
-                // Convert string method to HttpMethod enum
-                try {
-                    $method = HttpMethod::from($httpMethod);
-                } catch (\ValueError $e) {
-                    // If invalid method, fallback to the one from attribute
+                if ($httpMethod !== false) {
+                    // Convert string method to HttpMethod enum
+                    try {
+                        $method = HttpMethod::from($httpMethod);
+                    } catch (\ValueError $e) {
+                        // If invalid method, fallback to the one from attribute
+                        $method = $apiSwagger->method;
+                    }
+                } else {
                     $method = $apiSwagger->method;
                 }
             } else {
@@ -188,7 +194,7 @@ class SwaggerGenerator
         }
         
         // Convert enum to lowercase string for OpenAPI spec
-        $methodKey = strtolower($method->value);
+        $methodKey = $method instanceof HttpMethod ? strtolower($method->value) : strtolower((string) $method);
         
         // Create basic operation object
         $operation = [
@@ -208,14 +214,17 @@ class SwaggerGenerator
             $operation['deprecated'] = true;
         }
         
-        // Add request body if available
+        // Add request body based on attributes
         $this->addRequestBodyToOperation($reflectionMethod, $operation);
         
-        // Add response data if available
+        // Add responses based on attributes
         $this->addResponsesToOperation($reflectionMethod, $operation);
         
-        // Add exceptions if available
+        // Add exceptions as responses
         $this->addExceptionsToOperation($reflectionMethod, $operation);
+        
+        // Add validation error response if explicitly specified
+        $this->addValidationErrorResponse($reflectionMethod, $operation);
         
         // Add parameters from route
         $this->addParametersToOperation($route, $operation);
@@ -224,8 +233,9 @@ class SwaggerGenerator
         $this->addQueryParamsToOperation($reflectionMethod, $operation);
         
         // Add security if configured
-        if (config('swagger-attributes.security', [])) {
-            $operation['security'] = config('swagger-attributes.security');
+        $securityConfig = config('swagger-attributes.security');
+        if (!empty($securityConfig) && is_array($securityConfig)) {
+            $operation['security'] = $securityConfig;
         }
         
         // Add the operation to the path - convert enum to lowercase string for array key
@@ -308,6 +318,21 @@ class SwaggerGenerator
                 ]
             ]
         ];
+        
+        // Automatically add a validation error response (422) when validation rules are present
+        // Only add if it doesn't already exist
+        if (!empty($rules) && (!isset($operation['responses']['422']) || empty($operation['responses']['422']))) {
+            $operation['responses']['422'] = [
+                'description' => 'Validation Error',
+                'content' => [
+                    'application/json' => [
+                        'schema' => [
+                            '$ref' => '#/components/schemas/ValidationError'
+                        ]
+                    ]
+                ]
+            ];
+        }
     }
 
     /**
@@ -431,6 +456,38 @@ class SwaggerGenerator
             }
             
             $operation['responses'][$statusCode] = $response;
+        }
+    }
+    
+    /**
+     * Add validation error response to an operation
+     *
+     * @param ReflectionMethod $reflectionMethod The controller method reflection
+     * @param array $operation The OpenAPI operation object
+     */
+    protected function addValidationErrorResponse(ReflectionMethod $reflectionMethod, array &$operation): void
+    {
+        $validationErrorAttributes = $reflectionMethod->getAttributes(ApiSwaggerValidationErrorResponse::class);
+        
+        // If we already have a 422 response from the request body handling, don't add another one
+        if (isset($operation['responses']['422']) && !empty($operation['responses']['422'])) {
+            return;
+        }
+        
+        // Check if we have an explicit validation error response attribute
+        if (!empty($validationErrorAttributes)) {
+            $validationError = $validationErrorAttributes[0]->newInstance();
+            
+            $operation['responses']['422'] = [
+                'description' => $validationError->description,
+                'content' => [
+                    'application/json' => [
+                        'schema' => [
+                            '$ref' => '#/components/schemas/ValidationError'
+                        ]
+                    ]
+                ]
+            ];
         }
     }
 
@@ -631,74 +688,143 @@ class SwaggerGenerator
      */
     protected function getResponseSchema(ApiSwaggerResponse $response): array
     {
-        // If custom schema is provided, use it but ensure it follows OpenAPI structure
+        $modelSchema = null;
+        $resourceSchema = null;
+        $customProperties = [];
+        
+        // Generate model schema if a model is provided
+        if ($response->model && class_exists($response->model)) {
+            $modelSchema = $this->generateModelSchema($response->model);
+        }
+        
+        // Generate resource schema if a resource is provided
+        if ($response->resource && class_exists($response->resource)) {
+            $resourceSchema = $this->generateResourceSchema($response->resource, $response->model);
+            // If we have both resource and model schemas, resource takes precedence
+            if ($resourceSchema) {
+                $modelSchema = $resourceSchema;
+            }
+        }
+        
+        // Special case: check for 'model' keyword in schema
         if (!empty($response->schema)) {
+            // Special case: handle schema with 'data' property set to 'model'
+            if (isset($response->schema['data']) && $response->schema['data'] === 'model' && $modelSchema) {
+                // Return a nested structure with 'data' containing the model schema
+                return [
+                    'type' => 'object',
+                    'properties' => [
+                        'data' => $modelSchema
+                    ]
+                ];
+            }
+            
             // Check if schema already has a type and possibly properties structure
             if (isset($response->schema['type'])) {
-                return $response->schema;
+                if (!$modelSchema) {
+                    // If only schema is provided with type, return it directly
+                    return $response->schema;
+                }
+                // Both model and fully structured schema are present
+                // Combine them according to the desired logic below
             } else {
                 // Process properties to handle enums and convert to proper schema objects
-                $properties = [];
                 foreach ($response->schema as $property => $type) {
-                    if ($type instanceof OpenApiDataType) {
+                    if ($type === 'model' && $modelSchema) {
+                        // If a property is set to 'model', use the complete model schema
+                        $customProperties[$property] = $modelSchema;
+                    } elseif (is_object($type) && $type instanceof OpenApiDataType) {
                         // Convert OpenApiDataType enum to proper schema
-                        $properties[$property] = ['type' => $type->value];
+                        $customProperties[$property] = ['type' => $type->value];
                         
                         // Add format if available
                         $defaultFormat = $type->defaultFormat();
                         if ($defaultFormat) {
-                            $properties[$property]['format'] = $defaultFormat;
+                            $customProperties[$property]['format'] = $defaultFormat;
                         }
                     } elseif (is_array($type)) {
-                        // Array is already a schema definition
-                        $properties[$property] = $type;
+                        $customProperties[$property] = $type;
                     } else {
                         // String or other primitive value
-                        $properties[$property] = ['type' => (string)$type];
+                        $customProperties[$property] = ['type' => (string)$type];
                     }
                 }
-                
-                // Return properly structured schema
-                return [
-                    'type' => 'object',
-                    'properties' => $properties
-                ];
             }
         }
         
-        // If no model is provided, return a default schema
-        if (!$response->model || !class_exists($response->model)) {
+        // Now decide what schema to return based on what we've processed
+        
+        // If no model is provided, return the custom schema or an empty schema
+        if (!$modelSchema) {
+            if (!empty($customProperties)) {
+                return [
+                    'type' => 'object',
+                    'properties' => $customProperties
+                ];
+            }
             return ['type' => 'object', 'properties' => []];
         }
         
-        // Get schema from model
-        $schema = $this->generateModelSchema($response->model);
+        // If we have both model and custom properties, merge them
+        if (!empty($customProperties)) {
+            // Here's where we combine the model schema with custom properties
+            // Custom properties take precedence over model properties
+            $modelSchema['properties'] = array_merge(
+                $modelSchema['properties'] ?? [], 
+                $customProperties
+            );
+        }
         
-        // Use response type to determine the structure
+        // Use response type to determine the structure with the potentially modified model schema
         if ($response->responseType === ResponseType::PAGINATED) {
-            // Get the base structure from the ResponseType enum
-            $paginatedStructure = ResponseType::PAGINATED->getStructure();
-            
-            // Set the items schema for the data array
-            $paginatedStructure['properties']['data']['items'] = $schema;
+            // Create a paginated response structure
+            $paginatedStructure = [
+                'type' => 'object',
+                'properties' => [
+                    'data' => [
+                        'type' => 'array',
+                        'items' => $modelSchema
+                    ],
+                    'meta' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'current_page' => ['type' => 'integer'],
+                            'from' => ['type' => 'integer'],
+                            'last_page' => ['type' => 'integer'],
+                            'per_page' => ['type' => 'integer'],
+                            'to' => ['type' => 'integer'],
+                            'total' => ['type' => 'integer']
+                        ]
+                    ],
+                    'links' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'first' => ['type' => 'string'],
+                            'last' => ['type' => 'string'],
+                            'prev' => ['type' => 'string', 'nullable' => true],
+                            'next' => ['type' => 'string', 'nullable' => true]
+                        ]
+                    ]
+                ]
+            ];
             
             return $paginatedStructure;
         } elseif ($response->responseType === ResponseType::COLLECTION) {
-            // Get the base structure from the ResponseType enum
-            $collectionStructure = ResponseType::COLLECTION->getStructure();
-            
-            // Set the items schema
-            $collectionStructure['items'] = $schema;
+            // Create a collection structure
+            $collectionStructure = [
+                'type' => 'array',
+                'items' => $modelSchema
+            ];
             
             return $collectionStructure;
         }
         
         // For single item response, return the model schema directly
-        return $schema;
+        return $modelSchema;
     }
-
-/**
- * Generate schema from Eloquent model
+    
+    /**
+     * Generate schema from Eloquent model
  *
  * @param string $modelClass Fully qualified model class name
  * @return array The generated schema
@@ -752,6 +878,40 @@ protected function generateModelSchema(string $modelClass): array
         // If anything goes wrong, return a basic object schema
         return ['type' => 'object', 'properties' => []];
     }
+}
+
+    /**
+     * Generate an OpenAPI schema from a Laravel API Resource
+     *
+     * @param string $resourceClass Fully qualified class name of a Laravel Resource
+     * @param string|null $modelClass Optional related model class name
+     * @return array|null The generated schema or null if unable to generate
+     */
+    protected function generateResourceSchema(string $resourceClass, ?string $modelClass = null): ?array
+    {
+        static $resourceExtractor = null;
+        
+        try {
+            if ($resourceExtractor === null) {
+                $resourceExtractor = new ResourceSchemaExtractor();
+            }
+            
+            return $resourceExtractor->generateResourceSchema($resourceClass, $modelClass, $this);
+        } catch (\Exception $e) {
+            // Return a basic object schema if resource schema generation fails
+            return ['type' => 'object', 'properties' => []];
+        }
+    }
+    
+    /**
+     * Public method to get a model schema for use by other services
+     * 
+     * @param string $modelClass Fully qualified model class name
+     * @return array The generated schema
+     */
+    public function getModelSchema(string $modelClass): array
+    {
+        return $this->generateModelSchema($modelClass);
     }
     
     /**
@@ -759,7 +919,6 @@ protected function generateModelSchema(string $modelClass): array
      *
      * @param string $modelClass Fully qualified model class name
      * @return array Associative array of property names and their types
-     */
     protected function extractPhpDocPropertyTypes(string $modelClass): array
     {
         $propertyTypes = [];
@@ -792,10 +951,121 @@ protected function generateModelSchema(string $modelClass): array
             return [];
         }
     }
-    
+
+/**
+ * Map database column type to OpenAPI type
+ *
+ * @param string $databaseType The database column type
+ * @return array The OpenAPI type definition
+ */
+protected function mapDatabaseTypeToOpenApi(string $databaseType): array
+{
+    switch ($databaseType) {
+        // Integer types (MySQL and PostgreSQL)
+        case 'bigint':
+        case 'int':
+        case 'integer':
+        case 'smallint':
+        case 'tinyint':
+        case 'int2':          // PostgreSQL
+        case 'int4':          // PostgreSQL
+        case 'int8':          // PostgreSQL
+        case 'serial':        // PostgreSQL
+        case 'bigserial':     // PostgreSQL
+        case 'smallserial':   // PostgreSQL
+            return ['type' => 'integer'];
+            
+        // Numeric types (MySQL and PostgreSQL)
+        case 'decimal':
+        case 'double':
+        case 'float':
+        case 'numeric':       // PostgreSQL
+        case 'real':          // PostgreSQL
+        case 'money':         // PostgreSQL
+            return ['type' => 'number', 'format' => 'float'];
+            
+        // Boolean types
+        case 'boolean':
+        case 'bool':          // PostgreSQL
+            return ['type' => 'boolean'];
+            
+        // Date types
+        case 'date':
+            return ['type' => 'string', 'format' => 'date'];
+            
+        // Datetime types
+        case 'datetime':
+        case 'timestamp':
+        case 'timestamptz':   // PostgreSQL with timezone
+            return ['type' => 'string', 'format' => 'date-time'];
+            
+        // JSON types
+        case 'json':
+        case 'jsonb':         // PostgreSQL binary JSON
+        case 'array':         // For both MySQL and PostgreSQL arrays
+            return ['type' => 'object'];
+            
+        // Time types
+        case 'time':
+        case 'timetz':        // PostgreSQL time with timezone
+            return ['type' => 'string', 'format' => 'time'];
+            
+        // UUID types
+        case 'uuid':          // Both MySQL and PostgreSQL
+            return ['type' => 'string', 'format' => 'uuid'];
+        
+        // Network address types (PostgreSQL specific)
+        case 'inet':
+        case 'cidr':
+        case 'macaddr':
+            return ['type' => 'string'];
+            
+        // Geometric types (PostgreSQL specific)
+        case 'point':
+        case 'line':
+        case 'lseg':
+        case 'box':
+        case 'path':
+        case 'polygon':
+        case 'circle':
+            return ['type' => 'string', 'description' => 'PostgreSQL geometric type'];
+            
+        // Text and character types
+        case 'char':
+        case 'varchar':
+        case 'text':
+        case 'mediumtext':
+        case 'longtext':
+        case 'character':     // PostgreSQL
+        case 'character varying': // PostgreSQL
+        default:
+            return ['type' => 'string'];
+    }
+}
+
+/**
+ * Get the table name of a model
+ *
+ * @param string $modelClass Fully qualified model class name
+ * @return string|null The table name or null if unable to determine
+ */
+protected function getModelTableName(string $modelClass): ?string
+{
+    try {
+        $model = new $modelClass;
+        return $model->getTable();
+    } catch (\Exception $e) {
+        return null;
+    }
+}
+
+/**
+ * Generate an OpenAPI schema from a Laravel API Resource
+ *
+ * @param string $resourceClass Fully qualified class name of a Laravel Resource
     /**
-     * Convert PHP type from PHPDoc to OpenAPI schema
-     *
+     * Convert PHP type to OpenAPI schema type
+     * 
      * @param string $type PHP type from PHPDoc
      * @return array OpenAPI schema for the type
      */
@@ -868,90 +1138,6 @@ protected function generateModelSchema(string $modelClass): array
      * @param string $databaseType The database column type
      * @return array The OpenAPI type definition
      */
-    protected function mapDatabaseTypeToOpenApi(string $databaseType): array
-    {
-        switch ($databaseType) {
-            // Integer types (MySQL and PostgreSQL)
-            case 'bigint':
-            case 'int':
-            case 'integer':
-            case 'smallint':
-            case 'tinyint':
-            case 'int2':          // PostgreSQL
-            case 'int4':          // PostgreSQL
-            case 'int8':          // PostgreSQL
-            case 'serial':        // PostgreSQL
-            case 'bigserial':     // PostgreSQL
-            case 'smallserial':   // PostgreSQL
-                return ['type' => 'integer'];
-                
-            // Numeric types (MySQL and PostgreSQL)
-            case 'decimal':
-            case 'double':
-            case 'float':
-            case 'numeric':       // PostgreSQL
-            case 'real':          // PostgreSQL
-            case 'money':         // PostgreSQL
-                return ['type' => 'number', 'format' => 'float'];
-                
-            // Boolean types
-            case 'boolean':
-            case 'bool':          // PostgreSQL
-                return ['type' => 'boolean'];
-                
-            // Date types
-            case 'date':
-                return ['type' => 'string', 'format' => 'date'];
-                
-            // Datetime types
-            case 'datetime':
-            case 'timestamp':
-            case 'timestamptz':   // PostgreSQL with timezone
-                return ['type' => 'string', 'format' => 'date-time'];
-                
-            // JSON types
-            case 'json':
-            case 'jsonb':         // PostgreSQL binary JSON
-            case 'array':         // For both MySQL and PostgreSQL arrays
-                return ['type' => 'object'];
-                
-            // Time types
-            case 'time':
-            case 'timetz':        // PostgreSQL time with timezone
-                return ['type' => 'string', 'format' => 'time'];
-                
-            // UUID types
-            case 'uuid':          // Both MySQL and PostgreSQL
-                return ['type' => 'string', 'format' => 'uuid'];
-            
-            // Network address types (PostgreSQL specific)
-            case 'inet':
-            case 'cidr':
-            case 'macaddr':
-                return ['type' => 'string'];
-                
-            // Geometric types (PostgreSQL specific)
-            case 'point':
-            case 'line':
-            case 'lseg':
-            case 'box':
-            case 'path':
-            case 'polygon':
-            case 'circle':
-                return ['type' => 'string', 'description' => 'PostgreSQL geometric type'];
-                
-            // Text and character types
-            case 'char':
-            case 'varchar':
-            case 'text':
-            case 'mediumtext':
-            case 'longtext':
-            case 'character':     // PostgreSQL
-            case 'character varying': // PostgreSQL
-            default:
-                return ['type' => 'string'];
-        }
-    }
 
     /**
      * Save the documentation to a file

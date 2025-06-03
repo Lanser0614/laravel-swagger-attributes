@@ -1,11 +1,18 @@
 # Laravel Swagger Attributes
 
+[![Latest Version](https://img.shields.io/github/v/release/bellissimopizza/laravel-swagger-attributes)](https://github.com/bellissimopizza/laravel-swagger-attributes/releases)
+[![License](https://img.shields.io/github/license/bellissimopizza/laravel-swagger-attributes)](https://github.com/bellissimopizza/laravel-swagger-attributes/blob/main/LICENSE)
+
+> Version 4.0.0 now available with full Laravel API Resource support! Generate accurate OpenAPI schemas directly from your Resource classes.
+
 This package provides a clean way to generate Swagger/OpenAPI documentation for your Laravel API using PHP 8 Attributes instead of annotations.
 
 ## Features
 
 - Use modern PHP 8 Attributes to document your API endpoints
 - Leverage PHP 8 Enums for type safety and standardization
+- **[NEW in v4.0.0]** Full support for Laravel API Resources in response schema generation
+- **[NEW in v4.0.0]** Extract property types from Resource PHPDoc comments and method analysis
 - Automatically extract validation rules from Laravel Form Request classes
 - Document API exceptions with status codes and error messages
 - Command-line tool to scan routes and generate Swagger documentation
@@ -165,8 +172,8 @@ Document response data with automatic schema generation from Eloquent models:
     statusCode: 200,                     // HTTP status code
     description: 'Successful operation',  // Response description
     model: User::class,                   // Eloquent model (auto-generates schema from DB)
-    isCollection: false,                  // Whether it's a collection of models
-    isPaginated: false,                   // Whether it's a paginated response
+    resource: UserResource::class,        // Laravel API Resource (overrides model properties)
+    responseType: ResponseType::SINGLE,   // SINGLE, COLLECTION, or PAGINATED
     contentType: 'application/json'       // Content type
 )]
 
@@ -181,6 +188,73 @@ Document response data with automatic schema generation from Eloquent models:
         ]
     ]
 )]
+```
+
+#### Using Laravel API Resources
+
+The package now supports Laravel API Resources for response schema generation. This provides more flexibility when your API responses don't directly match your database models.
+
+```php
+// Basic API Resource usage
+#[ApiSwaggerResponse(
+    statusCode: HttpStatusCode::OK,
+    resource: UserResource::class,
+    responseType: ResponseType::SINGLE
+)]
+
+// Combine with a model for additional type information
+#[ApiSwaggerResponse(
+    statusCode: HttpStatusCode::OK,
+    model: User::class,            // Base model schema 
+    resource: UserResource::class,  // Resource overrides model properties
+    responseType: ResponseType::COLLECTION
+)]
+
+// API Resource with nested model placeholder
+#[ApiSwaggerResponse(
+    statusCode: HttpStatusCode::OK,
+    model: User::class,
+    resource: UserResource::class,
+    schema: [
+        'success' => OpenApiDataType::BOOLEAN,
+        'data' => 'model'  // This will be replaced with the resource schema
+    ]
+)]
+```
+
+The package automatically analyzes your API Resource classes to extract property information by:
+
+1. Using PHPDoc annotations in your resource's `toArray()` method
+2. Analyzing the resource structure when a model is provided
+3. Supporting nested models and resource structures
+
+For best results, document your API Resource properties using PHPDoc:
+
+```php
+class UserResource extends JsonResource
+{
+    /**
+     * Transform the resource into an array.
+     *
+     * @property int $id User ID
+     * @property string $name User's full name
+     * @property string $email User's email address
+     * @property array $permissions User's permissions
+     * @property string $created_at Creation timestamp
+     * 
+     * @return array
+     */
+    public function toArray($request)
+    {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'email' => $this->email,
+            'permissions' => $this->permissions,
+            'created_at' => $this->created_at->toIso8601String(),
+        ];
+    }
+}
 ```
 
 #### ApiSwaggerQueryParam
@@ -311,128 +385,55 @@ The package now reads documentation files directly from storage instead of requi
 
 You can view your API documentation at the route you specified in the configuration file.
 
-#### Fixed Tag Handling
+#### Validation Error Responses
 
-Endpoints are now properly grouped by tags in both Swagger UI and Redoc. The tag, summary, and description from your `ApiSwagger` attributes are correctly applied to the OpenAPI specification.
+The package now automatically adds a standard validation error response (HTTP 422) to endpoints that use validation rules through either:
 
-### Authentication
+1. Form Request classes via `ApiSwaggerRequestBody`
+2. Inline validation rules in `ApiSwaggerRequestBody`
 
-#### JWT Authentication
+This validation error schema matches Laravel's default validation error format:
 
-You can configure JWT authentication for your API endpoints by adding security schemes to your configuration:
-
-```php
-// In config/swagger-attributes.php
-'components' => [
-    'securitySchemes' => [
-        'JWT' => [
-            'description' => 'JWT bearer token description...',
-            'type' => 'http',
-            'scheme' => 'bearer',
-            'bearerFormat' => 'JWT',
-        ],
+```json
+{
+  "message": "The given data was invalid.",
+  "errors": {
+    "field_name": [
+      "The field_name field is required."
     ],
-],
-
-// Apply JWT security globally to all endpoints
-'security' => [
-    ['JWT' => []],
-],
+    "email": [
+      "The email must be a valid email address."
+    ]
+  }
+}
 ```
 
-To apply security to specific endpoints or override global security, use the security parameter in the ApiSwagger attribute:
+You can also manually add a validation error response to any endpoint by using the `ApiSwaggerValidationErrorResponse` attribute:
 
 ```php
 #[ApiSwagger(
+    method: HttpMethod::POST,
+    path: '/api/users',
     tag: 'Users',
-    summary: 'Get user profile',
-    security: [['JWT' => []]]
+    summary: 'Create a new user'
 )]
-public function profile()
-{
-    // ...
-}
-
-// Or to mark an endpoint as not requiring authentication:
-#[ApiSwagger(
-    tag: 'Auth',
-    summary: 'Login',
-    security: [] // Empty array means no security required
+#[ApiSwaggerRequestBody(
+    requestClass: StoreUserRequest::class
 )]
-public function login()
-{
-    // ...
-}
-```
-
-### Schema Usage Options
-
-The package provides multiple ways to define schemas for your API responses:
-
-#### 1. Using Eloquent Models
-
-```php
 #[ApiSwaggerResponse(
-    statusCode: 200,
-    model: User::class,
-    isCollection: false  // Set to true for arrays of models
+    statusCode: HttpStatusCode::CREATED,
+    model: User::class
 )]
-public function show(User $user)
-{
-    return $user;
-}
-```
-
-#### 2. Using Custom Schema Arrays with Enums
-
-```php
-#[ApiSwaggerResponse(
-    statusCode: 200,
-    schema: [
-        'id' => OpenApiDataType::INTEGER,
-        'name' => OpenApiDataType::STRING,
-        'email' => OpenApiDataType::EMAIL,
-        'created_at' => OpenApiDataType::DATE_TIME,
-        'is_active' => OpenApiDataType::BOOLEAN
-    ]
+#[ApiSwaggerValidationErrorResponse(
+    description: 'Validation failed for the submitted form data'
 )]
-public function getData()
+public function store(StoreUserRequest $request)
 {
     // ...
 }
 ```
 
-#### 3. Using Full OpenAPI Schema Objects
-
-```php
-#[ApiSwaggerResponse(
-    statusCode: 200,
-    schema: [
-        'type' => 'object',
-        'properties' => [
-            'id' => ['type' => 'integer'],
-            'name' => ['type' => 'string'],
-            'address' => [
-                'type' => 'object',
-                'properties' => [
-                    'street' => ['type' => 'string'],
-                    'city' => ['type' => 'string'],
-                    'zip' => ['type' => 'string']
-                ]
-            ],
-            'tags' => [
-                'type' => 'array',
-                'items' => ['type' => 'string']
-            ]
-        ],
-        'required' => ['id', 'name']
-    ]
-)]
-public function getComplexData()
-{
-    // ...
-}
-```
+The ValidationError schema is automatically registered in the OpenAPI components section and can be reused across your API documentation.
 
 ## Contributing
 
