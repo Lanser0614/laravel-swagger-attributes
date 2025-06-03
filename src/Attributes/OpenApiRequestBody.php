@@ -5,7 +5,7 @@ namespace BellissimoPizza\SwaggerAttributes\Attributes;
 use Attribute;
 
 #[Attribute(Attribute::TARGET_METHOD)]
-class ApiSwaggerRequestBody
+class OpenApiRequestBody
 {
     /**
      * @param string|null $requestClass Full class name of Laravel FormRequest (if any)

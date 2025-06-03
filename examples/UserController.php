@@ -4,10 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreUserRequest;
 use App\Models\User;
-use BellissimoPizza\SwaggerAttributes\Attributes\ApiSwagger;
-use BellissimoPizza\SwaggerAttributes\Attributes\ApiSwaggerRequestBody;
-use BellissimoPizza\SwaggerAttributes\Attributes\ApiSwaggerException;
-use BellissimoPizza\SwaggerAttributes\Attributes\ApiSwaggerResponse;
+use BellissimoPizza\SwaggerAttributes\Attributes\OpenApi;
+use BellissimoPizza\SwaggerAttributes\Attributes\OpenApiRequestBody;
+use BellissimoPizza\SwaggerAttributes\Attributes\OpenApiException;
+use BellissimoPizza\SwaggerAttributes\Attributes\OpenApiResponse;
 use Illuminate\Http\JsonResponse;
 
 class UserController extends Controller
@@ -15,26 +15,26 @@ class UserController extends Controller
     /**
      * Create a new user
      */
-    #[ApiSwagger(
+    #[OpenApi(
         tag: 'Users',
         summary: 'Create new user',
         description: 'Creates a new user with the provided data',
         method: 'POST'
     )]
-    #[ApiSwaggerRequestBody(
+    #[OpenApiRequestBody(
         requestClass: StoreUserRequest::class,
         description: 'User data for creating a new account'
     )]
-    #[ApiSwaggerResponse(
+    #[OpenApiResponse(
         statusCode: 201,
         description: 'User created successfully',
         model: User::class
     )]
-    #[ApiSwaggerException(
+    #[OpenApiException(
         statusCode: 422,
         message: 'Validation failed'
     )]
-    #[ApiSwaggerException(
+    #[OpenApiException(
         statusCode: 500,
         message: 'Server error'
     )]
@@ -51,18 +51,18 @@ class UserController extends Controller
     /**
      * Get user details
      */
-    #[ApiSwagger(
+    #[OpenApi(
         tag: 'Users',
         summary: 'Get user details',
         description: 'Retrieves detailed information about a specific user',
         method: 'GET'
     )]
-    #[ApiSwaggerResponse(
+    #[OpenApiResponse(
         statusCode: 200,
         description: 'User details retrieved successfully',
         model: User::class
     )]
-    #[ApiSwaggerException(
+    #[OpenApiException(
         statusCode: 404,
         message: 'User not found'
     )]
@@ -78,13 +78,13 @@ class UserController extends Controller
     /**
      * Get a list of users
      */
-    #[ApiSwagger(
+    #[OpenApi(
         tag: 'Users',
         summary: 'List all users',
         description: 'Retrieves a paginated list of all users',
         method: 'GET'
     )]
-    #[ApiSwaggerResponse(
+    #[OpenApiResponse(
         statusCode: 200,
         description: 'Users retrieved successfully',
         model: User::class,
@@ -101,13 +101,13 @@ class UserController extends Controller
     /**
      * Get user statistics
      */
-    #[ApiSwagger(
+    #[OpenApi(
         tag: 'Users',
         summary: 'Get user statistics',
         description: 'Retrieves aggregated statistics about users',
         method: 'GET'
     )]
-    #[ApiSwaggerResponse(
+    #[OpenApiResponse(
         statusCode: 200,
         description: 'Statistics retrieved successfully',
         schema: [

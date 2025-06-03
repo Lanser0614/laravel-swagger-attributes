@@ -5,7 +5,7 @@ namespace BellissimoPizza\SwaggerAttributes\Attributes;
 use Attribute;
 
 #[Attribute(Attribute::TARGET_METHOD)]
-class ApiSwaggerValidationErrorResponse
+class OpenApiValidationErrorResponse
 {
     /**
      * @param string $description Description of the validation error response

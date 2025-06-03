@@ -5,7 +5,6 @@ namespace BellissimoPizza\SwaggerAttributes\Services;
 use ReflectionClass;
 use ReflectionMethod;
 use Illuminate\Http\Resources\Json\JsonResource;
-use BellissimoPizza\SwaggerAttributes\Services\SwaggerGenerator;
 
 class ResourceSchemaExtractor
 {
@@ -24,22 +23,22 @@ class ResourceSchemaExtractor
             if (!class_exists($resourceClass)) {
                 return null;
             }
-            
+
             // Check if this is a Laravel resource by looking at the class hierarchy
             $reflectionClass = new ReflectionClass($resourceClass);
             $isResource = $reflectionClass->isSubclassOf(JsonResource::class);
-            
+
             if (!$isResource) {
                 // Not a Laravel resource, return null
                 return null;
             }
-            
+
             // Create a base schema structure
             $schema = [
                 'type' => 'object',
                 'properties' => []
             ];
-            
+
             // If we have a related model, get its schema as a starting point
             $modelSchema = null;
             if ($modelClass && class_exists($modelClass) && $generator) {
@@ -49,27 +48,27 @@ class ResourceSchemaExtractor
                     $schema['properties'] = $modelSchema['properties'];
                 }
             }
-            
+
             // Look for toArray method
             if ($reflectionClass->hasMethod('toArray')) {
                 $toArrayMethod = $reflectionClass->getMethod('toArray');
                 $docComment = $toArrayMethod->getDocComment();
-                
+
                 // Extract properties from doc comments if available
                 if ($docComment) {
                     $this->extractPropertiesFromDocComment($docComment, $schema);
                 }
-                
+
                 // Try to extract properties by analyzing the method body (advanced)
                 $this->extractPropertiesFromMethodBody($toArrayMethod, $schema);
             }
-            
+
             return $schema;
         } catch (\Exception $e) {
             return null;
         }
     }
-    
+
     /**
      * Extract properties from PHPDoc comment
      *
@@ -85,16 +84,16 @@ class ResourceSchemaExtractor
                 $type = $match[2];
                 $name = $match[3];
                 $description = $match[4] ?? null;
-                
+
                 // Convert PHP type to OpenAPI type
                 $schema['properties'][$name] = $this->convertPhpTypeToOpenApiType($type);
-                
+
                 if ($description) {
                     $schema['properties'][$name]['description'] = trim($description);
                 }
             }
         }
-        
+
         // Look for @return array structure documentation
         $returnPattern = '/@return\s+array\s*{([^}]+)}/m';
         if (preg_match($returnPattern, $docComment, $returnMatches)) {
@@ -105,9 +104,9 @@ class ResourceSchemaExtractor
                     $name = $match[1];
                     $type = $match[2];
                     $description = $match[3] ?? null;
-                    
+
                     $schema['properties'][$name] = $this->convertPhpTypeToOpenApiType($type);
-                    
+
                     if ($description) {
                         $schema['properties'][$name]['description'] = trim($description);
                     }
@@ -115,7 +114,7 @@ class ResourceSchemaExtractor
             }
         }
     }
-    
+
     /**
      * Extract properties by analyzing the method body
      * This is a basic implementation - a more advanced version would use code analysis
@@ -127,31 +126,32 @@ class ResourceSchemaExtractor
     {
         // This is a simplified approach - a more robust implementation would use
         // actual code parsing to analyze the return structure of the toArray method
-        
+
         $fileName = $method->getFileName();
         $startLine = $method->getStartLine();
         $endLine = $method->getEndLine();
-        
+
         if (!$fileName || !file_exists($fileName)) {
             return;
         }
-        
+
         $fileContent = file_get_contents($fileName);
         if (!$fileContent) {
             return;
         }
-        
+
         $lines = array_slice(
             explode("\n", $fileContent),
             $startLine - 1,
             $endLine - $startLine + 1
         );
-        
+
         $methodBody = implode("\n", $lines);
-        
+
         // Look for array keys in return statements
         $pattern = '/[\'"](\w+)[\'"]\s*=>\s*/';
         if (preg_match_all($pattern, $methodBody, $matches)) {
+            $schema['properties'] = [];
             foreach ($matches[1] as $property) {
                 if (!isset($schema['properties'][$property])) {
                     $schema['properties'][$property] = ['type' => 'string'];
@@ -159,7 +159,7 @@ class ResourceSchemaExtractor
             }
         }
     }
-    
+
     /**
      * Convert PHP type to OpenAPI type
      *
@@ -170,16 +170,16 @@ class ResourceSchemaExtractor
     {
         // Handle array types
         if (str_ends_with($phpType, '[]') || preg_match('/^array<(.+)>$/', $phpType)) {
-            $itemType = str_ends_with($phpType, '[]') 
+            $itemType = str_ends_with($phpType, '[]')
                 ? substr($phpType, 0, -2)
                 : preg_replace('/^array<(.+)>$/', '$1', $phpType);
-                
+
             return [
                 'type' => 'array',
                 'items' => $this->convertPhpTypeToOpenApiType($itemType)
             ];
         }
-        
+
         // Handle union types (e.g., string|null)
         if (str_contains($phpType, '|')) {
             $types = explode('|', $phpType);
@@ -190,7 +190,7 @@ class ResourceSchemaExtractor
                 return $this->convertPhpTypeToOpenApiType(reset($types));
             }
         }
-        
+
         // Map PHP types to OpenAPI types
         return match(strtolower($phpType)) {
             'string' => ['type' => 'string'],

@@ -20,12 +20,14 @@ use ReflectionClass;
 use ReflectionException;
 use ReflectionMethod;
 use Symfony\Component\Yaml\Yaml;
+use BellissimoPizza\SwaggerAttributes\Services\ResourceSchemaExtractor;
 use BellissimoPizza\SwaggerAttributes\Enums\HttpMethod;
+use BellissimoPizza\SwaggerAttributes\Enums\HttpStatusCode;
 use BellissimoPizza\SwaggerAttributes\Enums\OpenApiDataType;
 use BellissimoPizza\SwaggerAttributes\Enums\ResponseType;
 use ValueError;
 
-class SwaggerGenerator
+class OpenApiGenerator
 {
     /**
      * @var array The generated OpenAPI specification
@@ -45,7 +47,7 @@ class SwaggerGenerator
     }
 
     /**
-     * Generate the Swagger documentation
+     * Generate the OpenAPI documentation
      *
      * @param string $outputPath The file path to save the documentation
      * @param string $format The output format (json or yaml)
@@ -115,7 +117,7 @@ class SwaggerGenerator
     }
 
     /**
-     * Scan all routes for Swagger attributes
+     * Scan all routes for OpenAPI attributes
      */
     protected function scanRoutes(): void
     {
@@ -128,7 +130,7 @@ class SwaggerGenerator
     }
 
     /**
-     * Process a single route for Swagger attributes
+     * Process a single route for OpenAPI attributes
      *
      * @param Route $route The Laravel route
      * @param array $processedTags Array of already processed tags
@@ -144,14 +146,14 @@ class SwaggerGenerator
         
         [$controllerClass, $methodName] = explode('@', $actionName);
         
-        // Skip if controller class doesn't exist
+        // Skip if the controller class doesn't exist
         if (!class_exists($controllerClass)) {
             return;
         }
         
         $reflectionMethod = $this->getReflectionMethod($controllerClass, $methodName);
         
-        // Skip if method doesn't exist
+        // Skip if the method doesn't exist
         if (!$reflectionMethod) {
             return;
         }
@@ -184,7 +186,7 @@ class SwaggerGenerator
      *
      * @param Route $route The Laravel route
      * @param ReflectionMethod $reflectionMethod The controller method reflection
-     * @param OpenApi $apiSwagger The API Swagger attribute
+     * @param OpenApi $apiSwagger The API OpenAPI attribute
      */
     protected function addRouteToOpenApi(Route $route, ReflectionMethod $reflectionMethod, OpenApi $apiSwagger): void
     {
@@ -219,7 +221,7 @@ class SwaggerGenerator
             $method = $apiSwagger->method;
         }
         
-        // Initialize path if it doesn't exist
+        // Initialize a path if it doesn't exist
         if (!isset($this->openApi['paths'][$path])) {
             $this->openApi['paths'][$path] = [];
         }
@@ -245,7 +247,7 @@ class SwaggerGenerator
             $operation['deprecated'] = true;
         }
         
-        // Add request body based on attributes
+        // Add a request body based on attributes
         $this->addRequestBodyToOperation($reflectionMethod, $operation);
         
         // Add responses based on attributes
@@ -309,10 +311,7 @@ class SwaggerGenerator
         }
         
         $requestBody = $requestBodyAttributes[0]->newInstance();
-        $schema = [
-            'type' => 'object',
-            'properties' => []
-        ];
+        $schema = ['type' => 'object', 'properties' => []];
         
         // Get validation rules
         $rules = $requestBody->rules;
@@ -505,7 +504,7 @@ class SwaggerGenerator
         $validationErrorAttributes = $reflectionMethod->getAttributes(OpenApiValidationErrorResponse::class);
         
         // If we already have a 422 response from the request body handling, don't add another one
-        if (!empty($operation['responses']['422'])) {
+        if (isset($operation['responses']['422']) && !empty($operation['responses']['422'])) {
             return;
         }
         

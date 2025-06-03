@@ -2,10 +2,11 @@
 
 namespace BellissimoPizza\SwaggerAttributes\Commands;
 
+use BellissimoPizza\SwaggerAttributes\Services\OpenApiGenerator;
 use BellissimoPizza\SwaggerAttributes\Services\SwaggerGenerator;
 use Illuminate\Console\Command;
 
-class GenerateSwaggerDocCommand extends Command
+class GenerateOpenApiDocCommand extends Command
 {
     /**
      * The name and signature of the console command.
@@ -26,7 +27,7 @@ class GenerateSwaggerDocCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle(SwaggerGenerator $generator)
+    public function handle(OpenApiGenerator $generator): int
     {
         $outputPath = $this->option('output') ?: config('swagger-attributes.output_file');
         $format = strtolower($this->option('format'));

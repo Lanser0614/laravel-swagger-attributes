@@ -7,7 +7,7 @@ use BellissimoPizza\SwaggerAttributes\Enums\HttpStatusCode;
 use Exception;
 
 #[Attribute(Attribute::TARGET_METHOD | Attribute::IS_REPEATABLE)]
-class ApiSwaggerException
+class OpenApiException
 {
     /**
      * @param HttpStatusCode $statusCode HTTP status code for the exception

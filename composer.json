@@ -1,6 +1,6 @@
 {
     "name": "bellissimopizza/laravel-swagger-attributes",
-    "description": "Laravel Swagger documentation generator using PHP attributes",
+    "description": "Laravel OpenApi documentation generator using PHP attributes",
     "type": "library",
     "license": "MIT",
     "autoload": {

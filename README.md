@@ -90,25 +90,25 @@ return [
 Use PHP attributes to document your API endpoints. Here's a simple example:
 
 ```php
-use BellissimoPizza\SwaggerAttributes\Attributes\ApiSwagger;
-use BellissimoPizza\SwaggerAttributes\Attributes\ApiSwaggerRequestBody;
-use BellissimoPizza\SwaggerAttributes\Attributes\ApiSwaggerException;
+use BellissimoPizza\SwaggerAttributes\Attributes\OpenApi;
+use BellissimoPizza\SwaggerAttributes\Attributes\OpenApiRequestBody;
+use BellissimoPizza\SwaggerAttributes\Attributes\OpenApiException;
 
 class UserController extends Controller
 {
-    #[ApiSwagger(
+    #[OpenApi(
         tag: 'Users',
         summary: 'Create new user',
         method: 'POST'
     )]
-    #[ApiSwaggerRequestBody(
+    #[OpenApiRequestBody(
         requestClass: StoreUserRequest::class
     )]
-    #[ApiSwaggerException(
+    #[OpenApiException(
         statusCode: 422,
         message: 'Validation failed'
     )]
-    #[ApiSwaggerException(
+    #[OpenApiException(
         statusCode: 500,
         message: 'Server error'
     )]

@@ -2,9 +2,9 @@
 
 namespace BellissimoPizza\SwaggerAttributes\Tests\Feature\Services;
 
-use BellissimoPizza\SwaggerAttributes\Attributes\ApiSwagger;
-use BellissimoPizza\SwaggerAttributes\Attributes\ApiSwaggerQueryParam;
-use BellissimoPizza\SwaggerAttributes\Attributes\ApiSwaggerResponse;
+use BellissimoPizza\SwaggerAttributes\Attributes\OpenApi;
+use BellissimoPizza\SwaggerAttributes\Attributes\OpenApiQueryParam;
+use BellissimoPizza\SwaggerAttributes\Attributes\OpenApiResponse;
 use BellissimoPizza\SwaggerAttributes\Enums\HttpMethod;
 use BellissimoPizza\SwaggerAttributes\Enums\HttpStatusCode;
 use BellissimoPizza\SwaggerAttributes\Enums\OpenApiDataType;
@@ -54,20 +54,20 @@ class SwaggerGeneratorTest extends TestCase
     {
         // Create a mock controller method with query param attributes
         $controller = new class {
-            #[ApiSwagger(tag: 'Products', summary: 'List products')]
-            #[ApiSwaggerQueryParam(
+            #[OpenApi(tag: 'Products', summary: 'List products')]
+            #[OpenApiQueryParam(
                 name: 'category',
                 type: OpenApiDataType::STRING,
                 description: 'Filter by category',
                 example: 'electronics'
             )]
-            #[ApiSwaggerQueryParam(
+            #[OpenApiQueryParam(
                 name: 'price',
                 type: OpenApiDataType::NUMBER,
                 description: 'Filter by price',
                 required: true
             )]
-            #[ApiSwaggerResponse(
+            #[OpenApiResponse(
                 statusCode: HttpStatusCode::OK,
                 description: 'List of products'
             )]
@@ -123,16 +123,16 @@ class SwaggerGeneratorTest extends TestCase
     {
         // Create a mock controller method with response using HttpStatusCode enum
         $controller = new class {
-            #[ApiSwagger(
+            #[OpenApi(
                 tag: 'Users',
                 summary: 'Get user details', 
                 method: HttpMethod::GET
             )]
-            #[ApiSwaggerResponse(
+            #[OpenApiResponse(
                 statusCode: HttpStatusCode::OK,
                 description: 'User details'
             )]
-            #[ApiSwaggerResponse(
+            #[OpenApiResponse(
                 statusCode: HttpStatusCode::NOT_FOUND,
                 description: 'User not found'
             )]
@@ -177,7 +177,7 @@ class SwaggerGeneratorTest extends TestCase
     public function testResponseTypeEnumIntegration()
     {
         // Create a mock response with ResponseType enum
-        $response = new ApiSwaggerResponse(
+        $response = new OpenApiResponse(
             statusCode: HttpStatusCode::OK,
             description: 'List of items',
             responseType: ResponseType::COLLECTION

@@ -6,7 +6,7 @@ use Attribute;
 use BellissimoPizza\SwaggerAttributes\Enums\OpenApiDataType;
 
 #[Attribute(Attribute::TARGET_METHOD | Attribute::IS_REPEATABLE)]
-class ApiSwaggerQueryParam
+class OpenApiQueryParam
 {
     /**
      * @param string $name Name of the query parameter
@@ -16,7 +16,7 @@ class ApiSwaggerQueryParam
      * @param mixed $example Example value for the parameter
      * @param mixed $default Default value for the parameter
      * @param array $enum Possible values for enum type parameters
-     * @param string $format Format of the parameter (date, date-time, email, etc.)
+     * @param string|null $format Format of the parameter (date, date-time, email, etc.)
      * @param array $schema Additional schema properties for the parameter
      */
     public function __construct(

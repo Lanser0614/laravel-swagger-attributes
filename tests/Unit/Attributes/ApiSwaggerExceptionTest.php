@@ -2,7 +2,7 @@
 
 namespace BellissimoPizza\SwaggerAttributes\Tests\Unit\Attributes;
 
-use BellissimoPizza\SwaggerAttributes\Attributes\ApiSwaggerException;
+use BellissimoPizza\SwaggerAttributes\Attributes\OpenApiException;
 use BellissimoPizza\SwaggerAttributes\Enums\HttpStatusCode;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
@@ -11,7 +11,7 @@ class ApiSwaggerExceptionTest extends TestCase
 {
     public function testApiSwaggerExceptionWithEnum()
     {
-        $exception = new ApiSwaggerException(
+        $exception = new OpenApiException(
             statusCode: HttpStatusCode::NOT_FOUND,
             message: 'Resource not found'
         );
@@ -34,7 +34,7 @@ class ApiSwaggerExceptionTest extends TestCase
             ]
         ];
         
-        $exception = new ApiSwaggerException(
+        $exception = new OpenApiException(
             statusCode: HttpStatusCode::NOT_FOUND,
             message: 'Resource not found',
             exceptionClass: \Exception::class,
@@ -49,7 +49,7 @@ class ApiSwaggerExceptionTest extends TestCase
     
     public function testAttributeIsRepeatable()
     {
-        $reflectionClass = new ReflectionClass(ApiSwaggerException::class);
+        $reflectionClass = new ReflectionClass(OpenApiException::class);
         $attributes = $reflectionClass->getAttributes();
         
         $this->assertNotEmpty($attributes);
@@ -65,12 +65,12 @@ class ApiSwaggerExceptionTest extends TestCase
             }
         }
         
-        $this->assertTrue($found, 'ApiSwaggerException should be repeatable');
+        $this->assertTrue($found, 'OpenApiException should be repeatable');
     }
     
     public function testHttpStatusCodeEnumCanBeUsedAsKey()
     {
-        $exception = new ApiSwaggerException(
+        $exception = new OpenApiException(
             statusCode: HttpStatusCode::INTERNAL_SERVER_ERROR,
             message: 'Server error occurred'
         );

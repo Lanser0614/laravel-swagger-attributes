@@ -6,7 +6,7 @@ use Attribute;
 use BellissimoPizza\SwaggerAttributes\Enums\HttpMethod;
 
 #[Attribute(Attribute::TARGET_METHOD)]
-class ApiSwagger
+class OpenApi
 {
     /**
      * @param string $tag Tag for grouping API endpoints

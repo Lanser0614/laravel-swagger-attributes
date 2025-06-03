@@ -2,7 +2,7 @@
 
 namespace BellissimoPizza\SwaggerAttributes\Tests\Unit\Attributes;
 
-use BellissimoPizza\SwaggerAttributes\Attributes\ApiSwaggerQueryParam;
+use BellissimoPizza\SwaggerAttributes\Attributes\OpenApiQueryParam;
 use BellissimoPizza\SwaggerAttributes\Enums\OpenApiDataType;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
@@ -11,7 +11,7 @@ class ApiSwaggerQueryParamTest extends TestCase
 {
     public function testApiSwaggerQueryParamDefaults()
     {
-        $queryParam = new ApiSwaggerQueryParam(name: 'filter');
+        $queryParam = new OpenApiQueryParam(name: 'filter');
         
         $this->assertEquals('filter', $queryParam->name);
         $this->assertEquals(OpenApiDataType::STRING, $queryParam->type);
@@ -26,7 +26,7 @@ class ApiSwaggerQueryParamTest extends TestCase
     
     public function testApiSwaggerQueryParamCustomValues()
     {
-        $queryParam = new ApiSwaggerQueryParam(
+        $queryParam = new OpenApiQueryParam(
             name: 'status',
             type: OpenApiDataType::STRING,
             description: 'Filter by status',
@@ -51,7 +51,7 @@ class ApiSwaggerQueryParamTest extends TestCase
     
     public function testAttributeIsRepeatable()
     {
-        $reflectionClass = new ReflectionClass(ApiSwaggerQueryParam::class);
+        $reflectionClass = new ReflectionClass(OpenApiQueryParam::class);
         $attributes = $reflectionClass->getAttributes();
         
         $this->assertNotEmpty($attributes);
@@ -67,6 +67,6 @@ class ApiSwaggerQueryParamTest extends TestCase
             }
         }
         
-        $this->assertTrue($found, 'ApiSwaggerQueryParam should be repeatable');
+        $this->assertTrue($found, 'OpenApiQueryParam should be repeatable');
     }
 }

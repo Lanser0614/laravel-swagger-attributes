@@ -7,7 +7,7 @@ use BellissimoPizza\SwaggerAttributes\Enums\HttpStatusCode;
 use BellissimoPizza\SwaggerAttributes\Enums\ResponseType;
 
 #[Attribute(Attribute::TARGET_METHOD | Attribute::IS_REPEATABLE)]
-class ApiSwaggerResponse
+class OpenApiResponse
 {
     /**
      * @param HttpStatusCode $statusCode HTTP status code for the response
