@@ -21,7 +21,7 @@ if (config('openapi-attributes.ui.enabled', true)) {
 
     // Check if openapi UI is enabled
     if ($uiType === 'openapi' || $uiType === 'both') {
-        Route::get(config('openapi-attributes.ui.openapi_route', 'api/documentation'), function () use ($documentationPath) {
+        Route::get(config('openapi-attributes.ui.swagger_route', 'api/documentation'), function () use ($documentationPath) {
             if (file_exists($documentationPath)) {
                 // Read the documentation file content
                 $specContent = File::get($documentationPath);
