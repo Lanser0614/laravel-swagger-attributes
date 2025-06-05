@@ -68,7 +68,8 @@
                 plugins: [
                     SwaggerUIBundle.plugins.DownloadUrl
                 ],
-                layout: "StandaloneLayout"
+                layout: "StandaloneLayout",
+                filter: true // <-- This enables the search filter
             };
             
             const ui = SwaggerUIBundle(uiConfig);

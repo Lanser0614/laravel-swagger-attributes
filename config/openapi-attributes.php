@@ -90,8 +90,8 @@ return [
         'enabled' => env('SWAGGER_ENABLE_UI', true),
         
         // UI routes
-        'swagger_route' => env('SWAGGER_UI_ROUTE', 'api/documentation'),
-        'redoc_route' => env('REDOC_UI_ROUTE', 'api/redoc'),
+        'swagger_route' => env('SWAGGER_UI_ROUTE', 'api/swagger'),
+        'redoc_route' => env('REDOC_UI_ROUTE', 'api/docs'),
         
         // Route middleware for UI
         'middleware' => env('SWAGGER_UI_MIDDLEWARE', 'web'),
